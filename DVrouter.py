@@ -47,10 +47,13 @@ class DVrouter(Router):
             if neighbor is None or not isinstance(vector, dict):
                 return
 
-            normalized_vector = {
-                destination: min(self.infinity, int(cost))
-                for destination, cost in vector.items()
-            }
+            try:
+                normalized_vector = {
+                    destination: min(self.infinity, int(cost))
+                    for destination, cost in vector.items()
+                }
+            except (TypeError, ValueError):
+                return
             if self.neighbor_vectors.get(neighbor) != normalized_vector:
                 self.neighbor_vectors[neighbor] = normalized_vector
                 if self._recompute_distance_vector():

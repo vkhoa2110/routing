@@ -64,6 +64,7 @@ class LSrouter(Router):
         self.endpoint_to_port[endpoint] = port
         self.link_costs[endpoint] = cost
         self._publish_local_state()
+        self._send_known_link_states(port, exclude_origin=self.addr)
 
     def handle_remove_link(self, port):
         """Handle removed link."""
@@ -105,12 +106,29 @@ class LSrouter(Router):
         }
 
     def _broadcast_message(self, message, exclude_port=None):
-        content = dumps(message)
         for port, endpoint in list(self.port_to_endpoint.items()):
             if port == exclude_port:
                 continue
-            packet = Packet(Packet.ROUTING, self.addr, endpoint, content)
-            self.send(port, packet)
+            self._send_message(port, endpoint, message)
+
+    def _send_known_link_states(self, port, exclude_origin=None):
+        endpoint = self.port_to_endpoint.get(port)
+        if endpoint is None:
+            return
+        for origin, state in list(self.link_state_db.items()):
+            if origin == exclude_origin:
+                continue
+            message = {
+                "type": "LS",
+                "origin": origin,
+                "seq": state["seq"],
+                "links": dict(state["links"]),
+            }
+            self._send_message(port, endpoint, message)
+
+    def _send_message(self, port, endpoint, message):
+        packet = Packet(Packet.ROUTING, self.addr, endpoint, dumps(message))
+        self.send(port, packet)
 
     def _recompute_forwarding_table(self):
         distances = {self.addr: 0}
