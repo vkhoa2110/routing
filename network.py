@@ -17,38 +17,38 @@ def json_load_byteified(file_handle):
 
 
 def _byteify(data, ignore_dicts=False):
-    # If this is a unicode string, return its string representation
+    # Nếu dữ liệu là chuỗi unicode, trả về dạng bytes UTF-8 của chuỗi đó.
     if isinstance(data, str):
         return data.encode("utf-8")
-    # If this is a list of values, return list of byteified values
+    # Nếu dữ liệu là list, chuyển từng phần tử trong list.
     if isinstance(data, list):
         return [_byteify(item, ignore_dicts=True) for item in data]
-    # If this is a dictionary, return dictionary of byteified keys and values
-    # but only if we haven't already byteified it
+    # Nếu dữ liệu là dict, chuyển cả key và value, nhưng chỉ làm khi dict này
+    # chưa từng được chuyển ở bước gọi trước đó.
     if isinstance(data, dict) and not ignore_dicts:
         return {
             _byteify(key, ignore_dicts=True): _byteify(value, ignore_dicts=True)
             for key, value in data.items()
         }
-    # If this is anything else, return it in its original form
+    # Các kiểu dữ liệu khác được giữ nguyên.
     return data
 
 
 class Network:
-    """The Network class maintains all clients, routers, links, and confguration.
+    """Lớp Network quản lý toàn bộ client, router, link và cấu hình mô phỏng.
 
-    Parameters
-    ----------
+    Tham số
+    -------
     net_json_path
-        The path to the JSON file that contains the network configurations.
+        Đường dẫn tới file JSON chứa cấu hình mạng.
     RouterClass
-        Whether to use DVrouter, LSrouter, or the default router.
+        Lớp router sẽ được dùng: DVrouter, LSrouter hoặc router mặc định.
     visualize
-        Whether to visualize the network.
+        Có bật giao diện trực quan để quan sát mạng hay không.
     """
 
     def __init__(self, net_json_path, RouterClass, visualize=False):
-        # Parse configuration details
+        # Đọc các thông số cấu hình chung từ file JSON.
         with open(net_json_path, "r") as f:
             net_json = json.load(f)
         self.latency_multiplier = 100
@@ -58,25 +58,25 @@ class Network:
             self.latency_multiplier *= net_json["visualize"]["time_multiplier"]
         self.client_send_rate = net_json["client_send_rate"] * self.latency_multiplier
 
-        # Parse and create routers, clients, and links
+        # Tạo các router, client và link theo cấu hình.
         self.routers = self.parse_routers(net_json["routers"], RouterClass)
         self.clients = self.parse_clients(net_json["clients"], self.client_send_rate)
         self.links = self.parse_links(net_json["links"])
 
-        # Parse link changes
+        # Đọc lịch thay đổi link nếu file cấu hình có khai báo.
         if "changes" in net_json:
             self.changes = self.parse_changes(net_json["changes"])
         else:
             self.changes = None
 
-        # Parse correct routes and create some tracking fields
+        # Đọc route đúng để so sánh và chuẩn bị các biến theo dõi route hiện tại.
         self.correct_routes = self.parse_correct_routes(net_json["correct_routes"])
         self.threads = []
         self.routes = {}
         self.routes_lock = threading.Lock()
 
     def parse_routers(self, router_params, RouterClass):
-        """Parse routes from the `router_params` dict."""
+        """Tạo các router từ dict `router_params` trong file cấu hình."""
         routers = {}
         for addr in router_params:
             routers[addr] = RouterClass(
@@ -85,7 +85,7 @@ class Network:
         return routers
 
     def parse_clients(self, client_params, client_send_rate):
-        """Parse clients from `client_params` dict."""
+        """Tạo các client từ dict `client_params` trong file cấu hình."""
         clients = {}
         for addr in client_params:
             clients[addr] = Client(
@@ -94,7 +94,7 @@ class Network:
         return clients
 
     def parse_links(self, link_params):
-        """Parse links from the `link_params` dict."""
+        """Tạo các link từ danh sách `link_params` trong file cấu hình."""
         links = {}
         for addr1, addr2, p1, p2, c12, c21 in link_params:
             link = Link(addr1, addr2, c12, c21, self.latency_multiplier)
@@ -102,14 +102,14 @@ class Network:
         return links
 
     def parse_changes(self, changes_params):
-        """Parse link changes from the `changes_params` dict."""
+        """Tạo hàng đợi ưu tiên cho các sự kiện thay đổi link."""
         changes = queue.PriorityQueue()
         for change in changes_params:
             changes.put(change)
         return changes
 
     def parse_correct_routes(self, routes_params):
-        """Parse correct routes from the `routes_params` dict/"""
+        """Đọc danh sách route đúng từ cấu hình để dùng khi kiểm tra kết quả."""
         correct_routes = defaultdict(list)
         for route in routes_params:
             src, dst = route[0], route[-1]
@@ -117,10 +117,11 @@ class Network:
         return correct_routes
 
     def run(self):
-        """Run the network.
+        """Chạy toàn bộ mô phỏng mạng.
 
-        Start threads for each client and router. Start thread to track link changes.
-        If not visualizing, wait until end time and print the final routes.
+        Hàm tạo thread cho từng router và client, tạo thêm thread xử lý thay đổi
+        link nếu có. Nếu không chạy giao diện trực quan, simulator chờ tới thời
+        điểm kết thúc rồi in các route cuối cùng.
         """
         for router in self.routers.values():
             thread = RouterThread(router)
@@ -143,7 +144,7 @@ class Network:
             self.join_all()
 
     def add_links(self):
-        """Add links to clients and routers."""
+        """Gắn các link đã tạo vào client và router tương ứng."""
         for addr1, addr2 in self.links:
             p1, p2, c12, c21, link = self.links[(addr1, addr2)]
             if addr1 in self.clients:
@@ -156,10 +157,11 @@ class Network:
                 self.routers[addr2].change_link(("add", p2, addr1, link, c21))
 
     def handle_changes(self):
-        """Handle changes to links.
+        """Xử lý các sự kiện thay đổi link theo thời gian.
 
-        Run this method in a separate thread. Use a priority queue to track the time of
-        next change.
+        Phương thức này chạy trong thread riêng. Priority queue giúp lấy sự kiện
+        có thời điểm xảy ra sớm nhất trước, nhờ vậy simulator có thể thêm/gỡ link
+        đúng lịch đã khai báo trong file JSON.
         """
         start_time = time.time() * 1000
         while not self.changes.empty():
@@ -171,7 +173,7 @@ class Network:
             if wait_time > 0:
                 time.sleep(wait_time / 1000)
 
-            # Link changes
+            # Thêm hoặc gỡ link theo loại sự kiện.
             if change == "up":
                 addr1, addr2, p1, p2, c12, c21 = target
                 link = Link(addr1, addr2, c12, c21, self.latency_multiplier)
@@ -184,14 +186,16 @@ class Network:
                 self.routers[addr1].change_link(("remove", p1))
                 self.routers[addr2].change_link(("remove", p2))
 
-            # Update visualization
+            # Nếu đang chạy giao diện trực quan, cập nhật hình vẽ của link.
             if hasattr(Network, "visualize_changes_callback"):
                 Network.visualize_changes_callback(change, target)
 
     def update_route(self, src, dst, route):
         """
-        Callback function used by clients to update the current routes taken by
-        traceroute packets.
+        Hàm gọi lại để client cập nhật route hiện tại mà packet traceroute đã đi qua.
+
+        Network lưu route mới nhất cho từng cặp nguồn-đích, đồng thời đánh dấu
+        route đó có nằm trong danh sách route đúng của cấu hình hay không.
         """
         self.routes_lock.acquire()
         time_ms = int(round(time.time() * 1000))
@@ -207,8 +211,10 @@ class Network:
 
     def get_route_string(self, label_incorrect=True):
         """
-        Create a string with all the current routes found by traceroute packets and
-        whether they are correct.
+        Tạo chuỗi mô tả các route hiện tại tìm được bằng packet traceroute.
+
+        Nếu `label_incorrect` là True, các route sai sẽ được gắn nhãn để dễ nhìn
+        khi in ra terminal. Dòng cuối cùng cho biết toàn bộ route đã đúng hay chưa.
         """
         self.routes_lock.acquire()
         route_strings = []
@@ -229,20 +235,20 @@ class Network:
         return route_string
 
     def get_route_pickle(self):
-        """Create a pickle with the current routes found by traceroute packets."""
+        """Tạo dữ liệu pickle chứa các route hiện tại của packet traceroute."""
         self.routes_lock.acquire()
         route_pickle = pickle.dumps(self.routes)
         self.routes_lock.release()
         return route_pickle
 
     def reset_routes(self):
-        """Reset the routes found by traceroute packets."""
+        """Xóa các route traceroute đang được lưu."""
         self.routes_lock.acquire()
         self.routes = {}
         self.routes_lock.release()
 
     def final_routes(self):
-        """Have the clients send one final batch of traceroute packets."""
+        """Yêu cầu client gửi một lượt traceroute cuối để lấy kết quả sau cùng."""
         self.reset_routes()
         for client in self.clients.values():
             client.last_send()
@@ -300,7 +306,7 @@ class RouterThread(threading.Thread):
         self.router.run()
 
     def join(self, timeout=None):
-        # Terrible style (think about changing) but works like a charm
+        # Cách dừng thread này không đẹp, nhưng đủ dùng cho simulator nhỏ này.
         self.router.keep_running = False
         super(RouterThread, self).join(timeout)
 
@@ -315,7 +321,7 @@ class ClientThread(threading.Thread):
         self.client.run()
 
     def join(self, timeout=None):
-        # Terrible style (think about changing) but works like a charm
+        # Cách dừng thread này không đẹp, nhưng đủ dùng cho simulator nhỏ này.
         self.client.keep_running = False
         super(ClientThread, self).join(timeout)
 

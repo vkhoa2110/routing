@@ -10,7 +10,7 @@ from packet import Packet
 
 
 class App:
-    """Tkinter GUI application for network simulation visualizations."""
+    """Ứng dụng Tkinter dùng để hiển thị trực quan mô phỏng mạng."""
 
     def __init__(self, root, network, network_params):
         self.network = network
@@ -24,11 +24,11 @@ class App:
         self.display_current_routes_rate = 100
         self.display_current_debug_rate = 50
 
-        # Enclosing frame
+        # Frame chính chứa toàn bộ giao diện.
         self.frame = Frame(root)
         self.frame.grid(padx=10, pady=10)
 
-        # Canvas for drawing the network
+        # Canvas dùng để vẽ router, client, link và packet đang di chuyển.
         self.canvas_width = network_params["visualize"]["canvas_width"]
         self.canvas_height = network_params["visualize"]["canvas_height"]
         self.canvas = Canvas(
@@ -36,7 +36,7 @@ class App:
         )
         self.canvas.grid(column=1, row=1, rowspan=4)
 
-        # Text for displaying current routes
+        # Khung văn bản hiển thị các route hiện tại.
         self.route_label = Label(self.frame, text="Current routes:")
         self.route_label.grid(column=3, row=1)
         self.route_scrollbar = Scrollbar(self.frame)
@@ -44,7 +44,7 @@ class App:
         self.route_text = Text(self.frame, yscrollcommand=self.route_scrollbar.set)
         self.route_text.grid(column=3, row=2)
 
-        # Text for displaying debugging information
+        # Khung văn bản hiển thị thông tin debug của router được chọn.
         self.debug_label = Label(
             self.frame, text="Click on routers to print debug string below:"
         )
@@ -63,7 +63,7 @@ class App:
         _thread.start_new_thread(self.display_current_debug, ())
 
     def calc_rect_centers(self):
-        """Compute the centers of the rectangles representing clients/routers."""
+        """Tính tâm của các hình chữ nhật đại diện cho client/router."""
         rect_centers = {}
         grid_size = int(self.network_params["visualize"]["grid_size"])
         self.box_width = self.canvas_width / grid_size
@@ -77,7 +77,7 @@ class App:
         return rect_centers
 
     def draw_lines(self):
-        """Draw lines corresponding to links."""
+        """Vẽ các đường nối tương ứng với link trong mạng."""
         lines = {}
         line_labels = {}
         for addr1, addr2, _, _, c12, c21 in self.network_params["links"]:
@@ -87,7 +87,7 @@ class App:
         return lines, line_labels
 
     def draw_line(self, addr1, addr2, c12, c21):
-        """Draw a single line corresponding to one link."""
+        """Vẽ một đường nối cho một link cụ thể."""
         center1, center2 = self.rect_centers[addr1], self.rect_centers[addr2]
         line = self.canvas.create_line(
             center1[0],
@@ -117,7 +117,7 @@ class App:
         return line, label
 
     def draw_rectangles(self):
-        """Draw rectangles corresponding to clients/routers."""
+        """Vẽ các hình chữ nhật đại diện cho client và router."""
         rects = {}
         for label in self.rect_centers:
             if label in self.network.clients:
@@ -146,7 +146,7 @@ class App:
         return rects
 
     def inspect_client_or_router(self, addr):
-        """Handle a mouse click on a client or router."""
+        """Xử lý khi người dùng bấm chuột vào client hoặc router."""
         if addr in self.network.clients:
             if self.client_following:
                 self.canvas.itemconfig(self.rects[self.client_following], width=1)
@@ -167,7 +167,7 @@ class App:
                 self.router_following = None
 
     def packet_send(self, packet, src, dst, latency):
-        """Callback function to tell the visualization that a packet is being sent."""
+        """Hàm gọi lại được gọi khi một packet bắt đầu được gửi qua link."""
         if self.client_following:
             if packet.dst_addr == self.client_following and packet.is_traceroute:
                 fill_color = "green"
@@ -191,7 +191,7 @@ class App:
         )
 
     def movePacket(self, packet_rect, vx, vy, num_steps, step_time):
-        """Animate a moving packet, running on a separate thread."""
+        """Tạo animation cho packet đang di chuyển, chạy trong thread riêng."""
         s = num_steps
         while s > 0:
             time.sleep(step_time)
@@ -200,7 +200,7 @@ class App:
         self.canvas.delete(packet_rect)
 
     def display_current_routes(self):
-        """Display the current routes found by traceroute packets."""
+        """Cập nhật khung hiển thị các route traceroute hiện tại."""
         while True:
             route_string = self.network.get_route_string(label_incorrect=False)
             pos = self.route_scrollbar.get()
@@ -210,7 +210,7 @@ class App:
             time.sleep(self.display_current_routes_rate / 1000)
 
     def display_current_debug(self):
-        """Display the debug string of the currently selected router."""
+        """Cập nhật chuỗi debug của router đang được chọn."""
         while True:
             if self.router_following:
                 debug_text = repr(self.network.routers[self.router_following])
@@ -221,7 +221,7 @@ class App:
             time.sleep(self.display_current_debug_rate / 1000)
 
     def visualize_changes(self, change, target):
-        """Make color and text changes to links upon add/remove/cost changes."""
+        """Cập nhật hình vẽ khi link được thêm, gỡ hoặc đổi chi phí."""
         if change == "up":
             addr1, addr2, _, _, c12, c21 = target
             new_line, _ = self.draw_line(addr1, addr2, c12, c21)

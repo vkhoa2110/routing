@@ -6,15 +6,18 @@ import time
 
 class Link:
     """
-    The Link class represents link between two routers/clients handles sending and
-    receiving packets using threadsafe queues.
+    Lớp Link đại diện cho một đường nối giữa hai router/client.
 
-    Parameters
-    ----------
+    Link dùng hai hàng đợi an toàn với thread để mô phỏng việc gửi và nhận
+    packet theo hai chiều. Khi gửi packet, link sẽ chờ đúng độ trễ của chiều đó
+    rồi mới đưa packet vào hàng đợi nhận ở đầu còn lại.
+
+    Tham số
+    -------
     e1, e2
-        The addresses of the two endpoints of the link.
+        Địa chỉ của hai đầu kết nối.
     l12, l21
-        The latencies (in ms) in the e1->e2 and e2->e1 directions, respectively.
+        Độ trễ tính bằng mili-giây cho hai chiều e1->e2 và e2->e1.
     """
 
     def __init__(self, e1, e2, l12, l21, latency):
@@ -28,8 +31,11 @@ class Link:
 
     def _send_helper(self, packet, src):
         """
-        Run in a separate thread and send packet on link from `src` after waiting for
-        the appropriate latency.
+        Chạy trong thread riêng để gửi packet từ `src`.
+
+        Hàm này thêm node đích vào đường đi của packet, kích hoạt animation nếu
+        đang chạy giao diện, chờ theo độ trễ của link rồi đưa packet vào hàng đợi
+        nhận của đầu bên kia.
         """
         if src == self.e1:
             packet.add_to_route(self.e2)
@@ -45,8 +51,11 @@ class Link:
 
     def send(self, packet, src):
         """
-        Send packet on link from `src`. Checks that packet content is a string and
-        starts a new thread to send it. `src` must be equal to `self.e1` or `self.e2`.
+        Gửi packet trên link từ đầu `src`.
+
+        Nội dung packet, nếu có, bắt buộc phải là chuỗi. Hàm tạo một bản sao của
+        packet rồi mở thread mới để mô phỏng quá trình truyền có độ trễ. `src`
+        phải là một trong hai đầu của link: `self.e1` hoặc `self.e2`.
         """
         if packet.content:
             assert isinstance(packet.content, str), "Packet content must be a string"
@@ -55,9 +64,11 @@ class Link:
 
     def recv(self, dst, timeout=None):
         """
-        Check whether a packet is ready to be received by `dst` on this link. `dst` must
-        be equal to `self.e1` or `self.e2`. If the packet is ready, return the packet,
-        otherwise return `None`.
+        Kiểm tra xem đã có packet tới đầu `dst` của link hay chưa.
+
+        `dst` phải là `self.e1` hoặc `self.e2`. Nếu hàng đợi tương ứng đã có
+        packet thì trả về packet đó; nếu chưa có packet sẵn sàng thì trả về
+        `None` để vòng lặp mô phỏng tiếp tục chạy.
         """
         if dst == self.e1:
             try:
@@ -74,7 +85,7 @@ class Link:
 
     def change_latency(self, src, c):
         """
-        Update the latency of sending on the link from `src`.
+        Cập nhật độ trễ của chiều gửi bắt đầu từ `src`.
         """
         if src == self.e1:
             self.l12 = c * self.latency_multiplier

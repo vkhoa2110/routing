@@ -1,7 +1,7 @@
 ####################################################
 # DVrouter.py
-# Name:
-# HUID:
+# Tên:
+# Mã sinh viên:
 #####################################################
 
 from json import dumps, loads
@@ -11,15 +11,15 @@ from router import Router
 
 
 class DVrouter(Router):
-    """Distance vector routing protocol implementation.
+    """Cài đặt giao thức định tuyến Distance Vector.
 
-    Add your own class fields and initialization code (e.g. to create forwarding table
-    data structures). See the `Router` base class for docstrings of the methods to
-    override.
+    Router lưu chi phí tốt nhất đã biết tới từng đích, cổng cần gửi ra và
+    distance vector nhận được từ các router láng giềng. Khi có link mới, link bị
+    gỡ, hoặc nhận được vector mới từ láng giềng, router tính lại bảng định tuyến.
     """
 
     def __init__(self, addr, heartbeat_time):
-        Router.__init__(self, addr)  # Initialize base class - DO NOT REMOVE
+        Router.__init__(self, addr)  # Khởi tạo lớp cha - KHÔNG XÓA
         self.heartbeat_time = heartbeat_time
         self.last_time = 0
         self.infinity = 16
@@ -32,7 +32,12 @@ class DVrouter(Router):
         self.next_hops = {}
 
     def handle_packet(self, port, packet):
-        """Process incoming packet."""
+        """Xử lý packet đi vào router.
+
+        Nếu là packet traceroute thì chuyển tiếp theo forwarding table. Nếu là
+        packet định tuyến DV thì đọc vector của láng giềng, lưu lại và tính lại
+        distance vector của chính router này.
+        """
         if packet.is_traceroute:
             out_port = self.forwarding_table.get(packet.dst_addr)
             if out_port is not None:
@@ -60,7 +65,7 @@ class DVrouter(Router):
                     self._broadcast_distance_vector()
 
     def handle_new_link(self, port, endpoint, cost):
-        """Handle new link."""
+        """Xử lý khi router có thêm link mới tới `endpoint`."""
         self.port_to_endpoint[port] = endpoint
         self.endpoint_to_port[endpoint] = port
         self.link_costs[endpoint] = cost
@@ -68,7 +73,7 @@ class DVrouter(Router):
         self._broadcast_distance_vector()
 
     def handle_remove_link(self, port):
-        """Handle removed link."""
+        """Xử lý khi link trên `port` bị gỡ khỏi router."""
         endpoint = self.port_to_endpoint.pop(port, None)
         if endpoint is not None:
             if self.endpoint_to_port.get(endpoint) == port:
@@ -79,35 +84,43 @@ class DVrouter(Router):
             self._broadcast_distance_vector()
 
     def handle_time(self, time_ms):
-        """Handle current time."""
+        """Gửi định kỳ distance vector để các router khác luôn có thông tin mới."""
         if time_ms - self.last_time >= self.heartbeat_time:
             self.last_time = time_ms
             self._broadcast_distance_vector()
 
     def __repr__(self):
-        """Representation for debugging in the network visualizer."""
+        """Chuỗi dùng để debug khi bấm vào router trong giao diện mô phỏng."""
         return (
             f"DVrouter(addr={self.addr}, "
             f"vector={self.distance_vector}, forwarding={self.forwarding_table})"
         )
 
     def _recompute_distance_vector(self):
+        """Tính lại vector khoảng cách và forwarding table từ dữ liệu hiện có."""
+        # Tập đích cần xét gồm chính router, các láng giềng trực tiếp và mọi đích
+        # từng xuất hiện trong vector nhận được từ láng giềng.
         destinations = set(self.distance_vector)
         destinations.add(self.addr)
         destinations.update(self.link_costs)
         for vector in self.neighbor_vectors.values():
             destinations.update(vector)
 
+        # Ban đầu coi mọi đích là không tới được, sau đó cập nhật bằng chi phí tốt
+        # nhất tìm được theo công thức Bellman-Ford.
         new_vector = {destination: self.infinity for destination in destinations}
         new_vector[self.addr] = 0
         new_next_hops = {}
 
+        # Các láng giềng trực tiếp luôn là ứng viên đường đi đầu tiên.
         for destination, cost in self.link_costs.items():
             bounded_cost = min(self.infinity, cost)
             if bounded_cost < new_vector[destination]:
                 new_vector[destination] = bounded_cost
                 new_next_hops[destination] = destination
 
+        # Thử đi tới từng đích thông qua từng láng giềng, lấy tổng chi phí nhỏ
+        # nhất. Khi hòa chi phí, chọn next hop có tên nhỏ hơn để kết quả ổn định.
         for neighbor, vector in self.neighbor_vectors.items():
             if neighbor not in self.link_costs:
                 continue
@@ -132,6 +145,7 @@ class DVrouter(Router):
                     new_vector[destination] = total_cost
                     new_next_hops[destination] = neighbor
 
+        # Chỉ đưa vào forwarding table những đích thật sự tới được và có cổng gửi.
         new_forwarding_table = {}
         for destination, next_hop in new_next_hops.items():
             if destination == self.addr:
@@ -152,6 +166,7 @@ class DVrouter(Router):
         return changed
 
     def _broadcast_distance_vector(self):
+        """Gửi distance vector hiện tại tới tất cả láng giềng trực tiếp."""
         for port, endpoint in list(self.port_to_endpoint.items()):
             vector = self._vector_for_neighbor(endpoint)
             content = dumps({"type": "DV", "vector": vector})
@@ -159,6 +174,12 @@ class DVrouter(Router):
             self.send(port, packet)
 
     def _vector_for_neighbor(self, neighbor):
+        """Tạo vector gửi riêng cho một láng giềng.
+
+        Nếu đường tới một đích đang đi qua chính láng giềng đó, router quảng bá
+        chi phí vô cực cho đích ấy. Đây là kỹ thuật poison reverse để giảm vòng
+        lặp định tuyến và hạn chế bài toán count-to-infinity.
+        """
         vector = {}
         for destination, cost in self.distance_vector.items():
             advertised_cost = min(self.infinity, cost)
@@ -168,6 +189,7 @@ class DVrouter(Router):
         return vector
 
     def _decode(self, content):
+        """Giải mã nội dung JSON của packet định tuyến, lỗi thì trả về None."""
         try:
             return loads(content)
         except (TypeError, ValueError):

@@ -1,14 +1,14 @@
 #!/bin/bash
 ##
-## SYNOPSIS
+## TÓM TẮT
 ##    test_dv_ls
 ##
-## DESCRIPTION
-##    CS145 test script for project2.
-##    Runs a simulation of a network given each JSON file, then tests whether
-##    the routes obtained are correct (given the correct routes in the JSON file)
+## MÔ TẢ
+##    Script test CS145 cho project 2.
+##    Chạy mô phỏng mạng với từng file JSON, sau đó kiểm tra các route thu được
+##    có đúng với route chuẩn được khai báo trong file JSON hay không.
 
-# parse command line arguments
+# Phân tích tham số dòng lệnh.
 if [ $# -eq 0 ]; then
   ROUTER="BOTH"
 elif [[ ( $# -eq 1 ) && ( $1 == "DV" || $1 == "LS" || $1 == "BOTH" ) ]]; then
@@ -26,9 +26,9 @@ TIMEOUT_PER_TEST=60
 WORKSPACE=~/tmp/
 RESULT_FILE=test_result
 
-# testing functions
+# Các hàm phục vụ việc chạy test.
 
-# $1 = DV|LS, $2 = network simulation file, $3 = print separator (no if 0, yes otherwise)
+# $1 = DV|LS, $2 = file mô phỏng mạng, $3 = có in đường phân cách hay không.
 function test {
   timeOut=0
   printf "\n$testNum. Testing $2 with $1router\n"
@@ -74,7 +74,7 @@ function testAll {
 }
 
 ####################################################
-# RUN TESTS
+# CHẠY TEST
 ####################################################
 
 trap "rm -rf $WORKSPACE; exit 1" SIGINT
@@ -97,7 +97,7 @@ fi
 rm -rf $WORKSPACE
 
 #####################################################
-# Summary Results
+# TÓM TẮT KẾT QUẢ
 #####################################################
 
 printf "================================================================\n\n"

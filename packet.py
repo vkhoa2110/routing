@@ -3,20 +3,19 @@ import copy
 
 class Packet:
     """
-    The Packet class defines packets that clients and routers send in the simulated
-    network.
+    Lớp Packet mô tả packet được client và router gửi trong mạng mô phỏng.
 
-    Parameters
-    ----------
+    Tham số
+    -------
     kind
-        Either Packet.TRACEROUTE or Packet.ROUTING. Use Packet.ROUTING for all packets
-        created by your implementations.
+        Một trong hai giá trị `Packet.TRACEROUTE` hoặc `Packet.ROUTING`. Khi tự
+        tạo packet trong thuật toán định tuyến, hãy dùng `Packet.ROUTING`.
     src_addr
-        The address of the source of the packet.
+        Địa chỉ nguồn của packet.
     dst_addr
-        The address of the destination of the packet.
+        Địa chỉ đích của packet.
     content
-        The content of the packet. Must be a string.
+        Nội dung packet. Nếu có nội dung thì bắt buộc phải là chuỗi.
     """
 
     TRACEROUTE = 1
@@ -30,9 +29,10 @@ class Packet:
         self.route = [src_addr]
 
     def copy(self):
-        """Create a deep copy of the packet.
+        """Tạo bản sao sâu của packet.
 
-        This gets called automatically when the packet is sent to avoid aliasing issues.
+        Hàm này được gọi tự động khi gửi packet để tránh lỗi nhiều nơi cùng giữ
+        tham chiếu tới một object packet.
         """
         content = copy.deepcopy(self.content)
         p = Packet(self.kind, self.src_addr, self.dst_addr, content=content)
@@ -41,19 +41,19 @@ class Packet:
 
     @property
     def is_traceroute(self):
-        """Returns True if the packet is a traceroute packet."""
+        """Trả về True nếu packet là packet traceroute."""
         return self.kind == Packet.TRACEROUTE
 
     @property
     def is_routing(self):
-        """Returns True is the packet is a routing packet."""
+        """Trả về True nếu packet là packet định tuyến."""
         return self.kind == Packet.ROUTING
 
     def add_to_route(self, addr):
-        """DO NOT CALL from DVrouter or LSrouter!"""
+        """KHÔNG gọi hàm này từ DVrouter hoặc LSrouter."""
         self.route.append(addr)
 
     def animate_send(self, src, dst, latency):
-        """DO NOT CALL from DVrouter or LSrouter!"""
+        """KHÔNG gọi hàm này từ DVrouter hoặc LSrouter."""
         if hasattr(Packet, "animate"):
             Packet.animate(self, src, dst, latency)
